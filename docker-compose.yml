@@ -1,0 +1,59 @@
+# Dommy — çekirdek stack: Neo4j + proxy.
+# Dify AYRI çalışır (kendi resmi compose'u: dify/docker/). Bkz. SETUP.md.
+#
+#   docker compose up -d --build
+#   curl http://localhost:8090/health
+#
+services:
+  neo4j:
+    image: neo4j:5.26
+    container_name: dommy-neo4j
+    environment:
+      # wahaChat.py ile aynı kimlik: bolt://127.0.0.1:7999 / Graphiti2026!
+      NEO4J_AUTH: neo4j/Graphiti2026!
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+    ports:
+      - "7474:7474"     # tarayıcı: http://localhost:7474
+      - "7999:7687"     # bolt (proxy & wahaChat.py bunu kullanır)
+    volumes:
+      - neo4j_data:/data
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "Graphiti2026!", "RETURN 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+
+  dommy-proxy:
+    build:
+      context: ./widget
+      dockerfile: backend/Dockerfile
+    container_name: dommy-proxy
+    environment:
+      # Container ağı içinden Neo4j'ye servis adıyla erişilir
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: Graphiti2026!
+      NEO4J_DB: neo4j
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_BASE_URL: ${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai/}
+      CHAT_MODEL_ID: ${CHAT_MODEL_ID:-gemini-2.0-flash}
+      EMBEDDING_MODEL_ID: ${EMBEDDING_MODEL_ID:-gemini-embedding-001}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-768}
+      # Dify kurulunca doldur (boşsa doğrudan Neo4j+Gemini yoluna düşer):
+      DIFY_BASE_URL: ${DIFY_BASE_URL:-}
+      DIFY_APP_API_KEY: ${DIFY_APP_API_KEY:-}
+      DIFY_KB_API_KEY: ${DIFY_KB_API_KEY:-dommy-kb-dev-key}
+      ADMIN_KEY: ${ADMIN_KEY:-dommy-admin-dev-key}
+      LIVE_API_ENABLED: ${LIVE_API_ENABLED:-false}
+      OMNI_API_BASE: ${OMNI_API_BASE:-https://your-erp-api.example.com}
+      OMNI_API_AUTH: ${OMNI_API_AUTH:-}
+      DOMMY_TOKENS: ${DOMMY_TOKENS:-{"pk_live_demo3f9a":{"tenant":"almoso","role":"user"}}}
+    ports:
+      - "8090:8090"
+    depends_on:
+      neo4j:
+        condition: service_healthy
+
+volumes:
+  neo4j_data:

@@ -1,0 +1,23 @@
+{
+  "tenant": "almoso",
+  "pages": [
+    {
+      "url": "/satinalma/faturalar/yeni",
+      "name": "Yeni Satınalma Faturası",
+      "summary": "Bu ekranda yeni satınalma faturası oluşturulur. Muhasebe Dönemi alanı zorunludur. İlgili yıl dönemi (ör. 2026) Tanımlamalar > Dönemler ekranından açılmadıysa fatura kaydedilemez ve 'Dönem tanımlı değildir' hatası alınır. Onay kuralı: tutar 25.000 TL ve üzeri ise Genel Müdür onayı ZORUNLUDUR ('Onaya gönder' butonu kullanılır); 25.000 TL'nin altındaki faturalarda onay gerekmez, doğrudan 'Kaydet' edilir.",
+      "actions": ["Kaydet", "Vazgeç", "Onaya gönder"],
+      "links": [
+        { "label": "Dönem Tanımları'nı aç", "url": "/tanimlamalar/donemler" }
+      ]
+    },
+    {
+      "url": "/tanimlamalar/donemler",
+      "name": "Dönem Tanımları",
+      "summary": "Muhasebe dönemleri burada açılır ve kapatılır. Yeni dönem için 'Yeni Dönem' butonuna basıp yıl ve tarih aralığı girilir. Açılan dönem fatura ve mahsup ekranlarında seçilebilir hale gelir.",
+      "actions": ["Yeni Dönem", "Kaydet"],
+      "links": [
+        { "label": "Faturaya geri dön", "url": "/satinalma/faturalar/yeni" }
+      ]
+    }
+  ]
+}

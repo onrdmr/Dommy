@@ -1,0 +1,36 @@
+# --- Sırlar / kimlik bilgileri ---
+.env
+**/.env
+**/state.json
+**/appsettings*.json
+
+# --- Müşteriye/şirkete özgü veri ve üretilmiş dosyalar ---
+project-files/
+tools/out/
+widget/backend/api_catalog.json
+**/setxrm-pages.json
+
+# --- SETXRM'e özgü recon / export / generator scriptleri (public değil) ---
+tools/setxrm_*.py
+tools/setxrm_*.sql
+tools/build_*.py
+tools/testera-prompt.md
+
+# --- Bu kuruluma özgü kurulum notu (genel README repo'da) ---
+SETUP.md
+
+# --- Diğer projeler / üçüncü parti / ağır klasörler ---
+ai-services/
+omnistock/
+dify/
+.claude/
+.agents/
+
+# --- Python / Node / venv ---
+__pycache__/
+*.pyc
+.venv/
+venv/
+node_modules/
+*.log
+.DS_Store

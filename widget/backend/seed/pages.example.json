@@ -1,0 +1,36 @@
+{
+  "_aciklama": "ŞABLON — kopyala, kendi ERP sayfalarınla doldur, /admin/ingest'e gönder. Alt çizgili alanlar (_*) yok sayılır.",
+  "tenant": "almoso",
+  "pages": [
+    {
+      "_tip": "Form / validasyon ekranı — hata sebebi + çözüm + ilgili ekran",
+      "url": "/satinalma/siparis/yeni",
+      "name": "Yeni Satınalma Siparişi",
+      "summary": "Yeni satınalma siparişi oluşturulur. Tedarikçi ve en az bir kalem zorunludur. 'Cari hesap pasif' hatası alınırsa tedarikçi Tanımlamalar > Cariler ekranından aktif edilmelidir. Bütçe aşımında sipariş taslak kalır, onay gerekir.",
+      "actions": ["Kaydet", "Taslak Kaydet", "Onaya Gönder"],
+      "links": [
+        { "label": "Cari Tanımları'nı aç", "url": "/tanimlamalar/cariler" }
+      ]
+    },
+    {
+      "_tip": "Rapor ekranı — hangi metrik nerede, nasıl çıkarım yapılır",
+      "url": "/raporlar/urun-karlilik",
+      "name": "Ürün Kârlılık Raporu",
+      "summary": "Ürün bazında satış, maliyet ve brüt marj gösterir. Birim satış sütunu KDV hariçtir. Üretim maliyeti bu ekranda yoksa Maliyet API'sinden çekilir. Marj = (satış - maliyet) / satış. Tarih filtresi sağ üsttedir.",
+      "actions": ["Filtrele", "Excel'e Aktar"],
+      "links": [
+        { "label": "Maliyet Kartını aç", "url": "/stok/maliyet" }
+      ]
+    },
+    {
+      "_tip": "Liste ekranı — filtre kurma, toplu işlem",
+      "url": "/satinalma/faturalar",
+      "name": "Satınalma Faturaları Listesi",
+      "summary": "Tüm satınalma faturaları listelenir. Üstteki arama çubuğundan tedarikçi/no ile filtre yapılır. Vadesi geçmişleri görmek için Durum = Açık ve Vade < bugün filtresi kurulur. Satır seçip 'Toplu Onay' ile birden fazla fatura onaylanır.",
+      "actions": ["Yeni Fatura", "Filtrele", "Toplu Onay"],
+      "links": [
+        { "label": "Yeni fatura oluştur", "url": "/satinalma/faturalar/yeni" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Almoso ERP — Yeni Satınalma Faturası</title>
+<style>
+  body{margin:0;font-family:Segoe UI,system-ui,sans-serif;background:#eef1f6;color:#1f2430}
+  header{background:#1f2430;color:#fff;padding:14px 24px;font-weight:600;display:flex;gap:24px}
+  header .crumb{opacity:.6;font-weight:400;font-size:14px}
+  main{max-width:880px;margin:28px auto;padding:0 16px}
+  .card{background:#fff;border-radius:12px;padding:24px;box-shadow:0 2px 12px rgba(0,0,0,.06);margin-bottom:24px}
+  h2{margin:0 0 18px;font-size:18px}
+  .row{display:flex;gap:18px;margin-bottom:16px}
+  .fld{flex:1;display:flex;flex-direction:column;gap:6px}
+  label{font-size:13px;color:#55607a;font-weight:600}
+  input,select{padding:10px;border:1px solid #ccd2e0;border-radius:8px;font-size:14px}
+  .is-invalid{border-color:#dc2626;background:#fff5f5}
+  .invalid-feedback{color:#dc2626;font-size:12px}
+  .alert-danger{background:#fde8e8;color:#b91c1c;border:1px solid #f5c2c2;padding:12px 14px;border-radius:8px;margin-bottom:18px;font-size:14px}
+  .btn{padding:10px 18px;border-radius:8px;border:none;font-size:14px;cursor:pointer}
+  .btn-primary{background:#4f46e5;color:#fff}
+  .btn-ghost{background:#eef1f6;color:#55607a}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #eef1f6}
+  th{background:#f7f8fb;color:#55607a}
+</style>
+</head>
+<body>
+<header>
+  <span>ALMOSO</span>
+  <span class="crumb">Satınalma › Faturalar › <strong>Yeni</strong></span>
+</header>
+
+<main>
+  <div class="card">
+    <h2>Yeni Satınalma Faturası</h2>
+    <div class="alert-danger" role="alert">Dönem tanımlı değildir. Faturayı kaydetmeden önce muhasebe dönemini seçiniz.</div>
+    <div class="row">
+      <div class="fld">
+        <label for="tedarikci">Tedarikçi</label>
+        <input id="tedarikci" value="Bilgin Otomotiv A.Ş." />
+      </div>
+      <div class="fld">
+        <label for="donem">Muhasebe Dönemi</label>
+        <select id="donem" class="is-invalid" aria-invalid="true">
+          <option value="">— Seçiniz —</option>
+        </select>
+        <span class="invalid-feedback">Bu alan zorunludur (2026 dönemi tanımsız).</span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="fld">
+        <label for="tutar">Tutar (₺)</label>
+        <input id="tutar" value="48.500,00" />
+      </div>
+      <div class="fld">
+        <label for="tarih">Fatura Tarihi</label>
+        <input id="tarih" value="16.05.2026" />
+      </div>
+    </div>
+    <button class="btn btn-primary">Kaydet</button>
+    <button class="btn btn-ghost">Vazgeç</button>
+  </div>
+
+  <div class="card">
+    <h2>Bu Tedarikçinin Son Ürün Satışları (Rapor)</h2>
+    <table>
+      <thead>
+        <tr><th>Ürün</th><th>Satış Adedi</th><th>Birim Satış (₺)</th><th>Toplam (₺)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Fren Balatası FX-200</td><td>320</td><td>540,00</td><td>172.800,00</td></tr>
+        <tr><td>Yağ Filtresi OF-11</td><td>540</td><td>120,00</td><td>64.800,00</td></tr>
+        <tr><td>Triger Seti TS-90</td><td>85</td><td>1.250,00</td><td>106.250,00</td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<!-- ====================  DOMMY KURULUMU  ==================== -->
+<script>
+  window.DommyConfig = {
+    token: "pk_live_demo3f9a",
+    brand: "Almoso",
+    docs:  "https://docs.almoso.com",
+    apiBase: "",          // boş => MOCK modu (aşağıdaki DommyMock kullanılır)
+    accent: "#4f46e5"
+  };
+
+  /* ---------------------------------------------------------------
+   * MOCK BACKEND — gerçek Dify/Graphiti proxy'sinin yerini tutar.
+   * Üretimde bu blok SİLİNİR; apiBase set edilir. Burada sadece
+   * widget'ın DOM bağlamını nasıl kullandığını göstermek için var.
+   * --------------------------------------------------------------- */
+  window.DommyMock = function (payload) {
+    var q = payload.question.toLowerCase();
+    var ctx = payload.context;
+
+    // SENARYO 1 — Validasyon: DOM'daki hatayı oku, çözümü söyle, alanı parlat
+    if (/kaydet|hata|dönem|tanımlı|validasyon|neden olmuyor/.test(q) ||
+        (ctx.errors && ctx.errors.length)) {
+      var donemField = (ctx.form || []).find(function (f) {
+        return /dönem/i.test(f.label);
+      });
+      return {
+        reply:
+          "Bu hatanın sebebi: 2026 muhasebe dönemi henüz tanımlı değil, bu yüzden " +
+          '"Muhasebe Dönemi" alanı boş ve fatura kaydedilemiyor.\n\n' +
+          "Çözüm: Tanımlamalar → Dönemler ekranından 2026 dönemini açın, " +
+          "sonra bu faturaya dönüp dönemi seçin.",
+        actions: [
+          donemField && {
+            type: "highlight",
+            ref: donemField.ref,
+            label: "Eksik alanı göster",
+            autoRun: true
+          },
+          {
+            type: "navigate",
+            url: "/tanimlamalar/donemler",
+            label: "Dönem Tanımları'nı aç"
+          },
+          {
+            type: "link",
+            url: (payload.context && CFG_docs()) + "/satinalma#donem",
+            label: "Dokümana git"
+          }
+        ].filter(Boolean)
+      };
+    }
+
+    // SENARYO 2 — Rapor çıkarımı: sayfadaki tabloyu oku, eksik veriyi
+    // (üretim maliyeti) "iç rapora sor" -> çıkarım dön
+    if (/maliyet|kâr|kar |karlılık|çıkarım|üretim|kazan/.test(q)) {
+      var t = (ctx.tables || [])[0];
+      var line = t && t.rows && t.rows[0] ? t.rows[0].join(" · ") : "veri yok";
+      return {
+        reply:
+          "Sayfadaki satış raporunu okudum (en çok ciro: " + line + ").\n\n" +
+          "Üretim maliyeti bu ekranda yok; bu yüzden Maliyet API'sine sordum " +
+          "(GET /api/v1/cost?sku=FX-200 → ortalama ₺387,40).\n\n" +
+          "Çıkarım: Fren Balatası FX-200 için birim satış ₺540, üretim maliyeti " +
+          "≈ ₺387,40 → brüt marj ≈ %28,3. 320 adette yaklaşık ₺48.832 brüt kâr. " +
+          "En zayıf marj Yağ Filtresi OF-11 tarafında olabilir, istersen onu da çıkarayım.",
+        actions: [
+          t && { type: "highlight", ref: t.ref, label: "İlgili raporu göster", autoRun: true },
+          { type: "navigate", url: "/raporlar/urun-karlilik", label: "Ürün Kârlılık raporunu aç" }
+        ].filter(Boolean)
+      };
+    }
+
+    // Varsayılan — sayfa bağlamını özetle (DOM-awareness kanıtı)
+    return {
+      reply:
+        'Şu an "' + ctx.title + '" ekranındasın (' + ctx.path + ").\n" +
+        "Sayfada " + (ctx.form || []).length + " form alanı, " +
+        (ctx.actions || []).length + " aksiyon ve " +
+        (ctx.errors || []).length + " uyarı görüyorum. " +
+        "Bir hata mı alıyorsun, yoksa rapordan çıkarım mı istiyorsun?",
+      actions: []
+    };
+  };
+  function CFG_docs(){ return (window.DommyConfig && window.DommyConfig.docs) || ""; }
+</script>
+<script src="../dist/dommy.js" defer></script>
+</body>
+</html>
