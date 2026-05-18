@@ -158,6 +158,30 @@
               el.classList.contains("error"),
           });
         });
+      // SETXRM/özel detay alanları: label.form-label + .view-detail-mode değeri
+      // (gerçek <input> boş/gizli; görünen değer custom div'de)
+      var seen = {};
+      qAll(".form-group, [data-formulaname]").forEach(function (g) {
+        if (fields.length >= 70) return;
+        if ((g.className || "").indexOf("hidden") !== -1 || !visible(g)) return;
+        var v = g.querySelector(".view-detail-mode");
+        if (!v) return;
+        var lab = g.querySelector("label");
+        var label = (lab ? txt(lab) : "").trim();
+        var val = (v.innerText || v.textContent || "")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (!label || !val || val === "-" || seen[label]) return;
+        seen[label] = 1;
+        fields.push({
+          ref: tagRef(g),
+          label: label.slice(0, 80),
+          type: "detail",
+          value: val.slice(0, 120),
+          empty: false,
+          invalid: false,
+        });
+      });
       return fields;
     }
 
@@ -176,23 +200,44 @@
     // Sayfadaki ilk tablo/rapor verisini (kısıtlı) yakalar — rapor çıkarımı için
     function collectTables() {
       var out = [];
-      qAll("table").forEach(function (tbl) {
-        if (out.length >= 2) return;
+      // <table> + yaygın grid bileşenleri (Kendo/DevExpress/ag-Grid/SETXRM)
+      qAll(
+        "table, [role=grid], .k-grid, .dx-datagrid, .ag-root, .ant-table, .p-datatable, .rgt-wrapper"
+      ).forEach(function (tbl) {
+        if (out.length >= 6 || !visible(tbl)) return;
+        // başlık: thead th / role=columnheader / ilk satır th|td
         var head = [];
-        tbl.querySelectorAll("thead th, tr:first-child th").forEach(function (th) {
-          head.push(txt(th));
+        tbl.querySelectorAll(
+          'thead th, [role=columnheader], .k-grid-header th, .dx-header-row td, .ag-header-cell-text'
+        ).forEach(function (h) {
+          var t = txt(h);
+          if (t) head.push(t);
         });
+        if (!head.length) {
+          var fr = tbl.querySelector("tr");
+          if (fr)
+            fr.querySelectorAll("th,td").forEach(function (c) {
+              head.push(txt(c));
+            });
+        }
         var rows = [];
-        tbl.querySelectorAll("tbody tr").forEach(function (tr) {
-          if (rows.length >= 20) return;
-          var cells = [];
-          tr.querySelectorAll("td").forEach(function (td) {
-            cells.push(txt(td));
+        tbl
+          .querySelectorAll(
+            'tbody tr, [role=row], .k-table-row, .dx-data-row, .ag-row, .ant-table-row'
+          )
+          .forEach(function (tr) {
+            if (rows.length >= 15) return;
+            var cells = [];
+            tr.querySelectorAll('td, [role=gridcell], [role=cell], .ag-cell').forEach(
+              function (c) {
+                var t = txt(c);
+                if (t) cells.push(t);
+              }
+            );
+            if (cells.length) rows.push(cells.slice(0, 14));
           });
-          if (cells.length) rows.push(cells);
-        });
-        if (head.length || rows.length)
-          out.push({ ref: tagRef(tbl), columns: head, rows: rows });
+        if (rows.length)
+          out.push({ ref: tagRef(tbl), columns: head.slice(0, 14), rows: rows });
       });
       return out;
     }
@@ -222,7 +267,9 @@
       var src = dlg.length ? dlg[dlg.length - 1] : null;
       if (!src) {
         // ana içerik
-        var mains = qAll('main,[role=main],.content,.page-content,.main-content');
+        var mains = qAll(
+          'main,[role=main],.content,.page-content,.main-content,.container-fluid'
+        );
         src = mains.filter(visible)[0] || null;
       }
       if (src) {

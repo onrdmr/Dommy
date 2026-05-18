@@ -86,6 +86,10 @@ async def _maybe_call_api(req: AskRequest) -> str | None:
 _SYSTEM = """Sen Dommy'sin: bir B2B uygulamasının sayfasına gömülü, DOM-farkındalıklı asistan.
 Sana kullanıcının o anki sayfasının bağlamı (URL, form alanları, hatalar, tablolar)
 ve iç dokümanlardan getirilen bilgiler verilir. Görevin:
+- EKRANDA GÖRÜNEN VERİ ÖNCELİKLİDİR: FORM/TABLO/EKRAN-MODAL METNİ'nde bir
+  değer (maliyet, fiyat, miktar, tarih) varsa onu OKU ve doğrudan söyle;
+  "bu ekranda yok, ilgili ekrana gidin" DEME. Yalnızca gerçekten hiçbir
+  bağlamda yoksa dokümana/ilgili ekrana yönlendir.
 - SİSTEME ÖZGÜ veri/kural/sayı (bu ERP'deki reçete miktarı, fiyat, kayıt,
   validasyon, iş kuralı) SADECE dokümanlardan/CANLI VERİ'den gelir; yoksa
   "sistemde tanımlı/kayıtlı değil" de, ASLA uydurma.
@@ -136,12 +140,12 @@ def _ctx_brief(req: AskRequest) -> str:
         )
     if c.actions:
         parts.append("AKSİYONLAR: " + ", ".join(f"({a.ref}){a.label}" for a in c.actions[:15]))
-    if c.tables:
-        t = c.tables[0]
-        parts.append(
+    for t in c.tables[:5]:  # ekrandaki veri ızgaraları — değer/maliyet/fiyat burada
+        block = (
             f"TABLO ({t.ref}) sütunlar={t.columns} satırlar="
-            + json.dumps(t.rows[:8], ensure_ascii=False)
+            + json.dumps(t.rows[:10], ensure_ascii=False)
         )
+        parts.append(block[:2500])
     if c.screenText:
         parts.append("EKRAN/MODAL METNİ (görünen içerik): " + mask(c.screenText[:1800]))
     return "\n".join(parts)

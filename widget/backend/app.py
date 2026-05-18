@@ -50,7 +50,7 @@ async def widget_js():
     return FileResponse(
         path,
         media_type="application/javascript",
-        headers={"Cache-Control": "public, max-age=300"},
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
     )
 
 
