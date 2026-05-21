@@ -147,5 +147,57 @@ async def upsert_pages(tenant: str, pages: list) -> int:
     return n
 
 
+# ---------- Konsol (admin) sorguları ----------
+def list_pages(tenant: str = "", limit: int = 500) -> list[dict]:
+    q = """
+    MATCH (p:Entity {kind:'Page'})
+    WHERE ($tenant = '' OR p.group_id = $tenant)
+    OPTIONAL MATCH (p)-[:HAS_ACTION]->(a:Entity {kind:'Action'})
+    WITH p, count(a) AS acts
+    RETURN p.url AS url, p.name AS name, p.group_id AS tenant,
+           substring(coalesce(p.summary,''), 0, 400) AS summary, acts AS actions
+    ORDER BY p.url LIMIT $limit
+    """
+    recs, _, _ = _driver.execute_query(
+        q, tenant=tenant or "", limit=limit, database_=settings.NEO4J_DB
+    )
+    return [r.data() for r in recs]
+
+
+def graph_overview(tenant: str = "", limit: int = 300) -> dict:
+    kinds, _, _ = _driver.execute_query(
+        """MATCH (n:Entity) WHERE ($tenant='' OR n.group_id=$tenant)
+           RETURN coalesce(n.kind,'(yok)') AS kind, count(*) AS c ORDER BY c DESC""",
+        tenant=tenant or "", database_=settings.NEO4J_DB,
+    )
+    rels, _, _ = _driver.execute_query(
+        """MATCH (a:Entity)-[r]->(b:Entity)
+           WHERE ($tenant='' OR a.group_id=$tenant)
+           RETURN coalesce(a.name,a.url) AS src, type(r) AS rel,
+                  coalesce(b.name,b.url) AS dst LIMIT $limit""",
+        tenant=tenant or "", limit=limit, database_=settings.NEO4J_DB,
+    )
+    tens, _, _ = _driver.execute_query(
+        "MATCH (n:Entity) RETURN DISTINCT n.group_id AS t ORDER BY t",
+        database_=settings.NEO4J_DB,
+    )
+    return {
+        "kinds": [r.data() for r in kinds],
+        "relations": [r.data() for r in rels],
+        "tenants": [r["t"] for r in tens if r["t"]],
+    }
+
+
+def stats(tenant: str = "") -> dict:
+    recs, _, _ = _driver.execute_query(
+        """MATCH (n:Entity) WHERE ($tenant='' OR n.group_id=$tenant)
+           RETURN coalesce(n.kind,'(yok)') AS kind, count(*) AS c""",
+        tenant=tenant or "", database_=settings.NEO4J_DB,
+    )
+    by = {r["kind"]: r["c"] for r in recs}
+    return {"pages": by.get("Page", 0), "actions": by.get("Action", 0),
+            "total": sum(by.values()), "by_kind": by}
+
+
 def close():
     _driver.close()

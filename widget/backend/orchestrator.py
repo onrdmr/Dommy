@@ -19,7 +19,36 @@ from .models import AskRequest
 from .pii import mask
 from . import graph
 
-_chat = AsyncOpenAI(base_url=settings.GEMINI_BASE_URL, api_key=settings.GEMINI_API_KEY)
+# Çalışma-anı LLM sağlayıcısı — OpenAI-uyumlu herhangi bir uç (Gemini, OpenAI,
+# Groq, yerel LM Studio...). Konsoldan /admin/config ile değiştirilebilir.
+_provider = {
+    "model": settings.CHAT_MODEL_ID,
+    "base_url": settings.GEMINI_BASE_URL,
+    "api_key": settings.GEMINI_API_KEY,
+}
+_chat = AsyncOpenAI(base_url=_provider["base_url"], api_key=_provider["api_key"])
+
+
+def provider_info() -> dict:
+    return {
+        "model": _provider["model"],
+        "base_url": _provider["base_url"],
+        "has_key": bool(_provider["api_key"]),
+        "dify": settings.use_dify,
+        "live_api": settings.LIVE_API_ENABLED,
+    }
+
+
+def set_provider(model=None, base_url=None, api_key=None) -> dict:
+    global _chat
+    if model:
+        _provider["model"] = model.strip()
+    if base_url:
+        _provider["base_url"] = base_url.strip().rstrip("/") + "/" if base_url.strip() else _provider["base_url"]
+    if api_key:
+        _provider["api_key"] = api_key.strip()
+    _chat = AsyncOpenAI(base_url=_provider["base_url"], api_key=_provider["api_key"])
+    return provider_info()
 
 # Canlı veri tool kataloğu (SADECE GET). Yoksa katman pasif.
 _CAT_PATH = pathlib.Path(__file__).parent / "api_catalog.json"
@@ -51,7 +80,7 @@ async def _maybe_call_api(req: AskRequest) -> str | None:
     )
     try:
         r = await _chat.chat.completions.create(
-            model=settings.CHAT_MODEL_ID,
+            model=_provider["model"],
             messages=[{"role": "user", "content": decide}],
             temperature=0,
         )
@@ -184,6 +213,7 @@ async def _via_dify(req: AskRequest, who: Principal) -> dict:
         body = r.json()
     out = _parse_json(body.get("answer", ""))
     out["conversationId"] = body.get("conversation_id")
+    out["source"] = "dify"
     return out
 
 
@@ -216,7 +246,7 @@ async def _via_direct(req: AskRequest, who: Principal) -> dict:
         + f"GEÇMİŞ:\n{hist}\n\nSORU: {req.question}"
     )
     resp = await _chat.chat.completions.create(
-        model=settings.CHAT_MODEL_ID,
+        model=_provider["model"],
         messages=[
             {"role": "system", "content": _SYSTEM},
             {"role": "user", "content": user_msg},
@@ -225,6 +255,7 @@ async def _via_direct(req: AskRequest, who: Principal) -> dict:
     )
     out = _parse_json(resp.choices[0].message.content)
     out["conversationId"] = req.conversationId
+    out["source"] = "api" if api_text else ("docs" if (active or others) else "none")
     return out
 
 

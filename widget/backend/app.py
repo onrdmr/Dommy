@@ -7,12 +7,14 @@ Uçlar:
 """
 import logging
 import os
-from fastapi import FastAPI, Header, HTTPException
+import time
+from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
 
 from .config import settings
 from .auth import resolve
+from . import events
 from .models import (
     AskRequest,
     AskResponse,
@@ -67,15 +69,24 @@ async def ask(req: AskRequest):
         raise HTTPException(status_code=401, detail="Geçersiz token")
     if not req.question.strip():
         raise HTTPException(status_code=400, detail="Boş soru")
+    t0 = time.time()
     try:
         data = await orchestrator.answer(req, who)
     except Exception as e:  # noqa: BLE001 — iskelet; üretimde tipli yakala
         log.exception("orchestrator hata")
+        events.log(who.tenant, req.question, f"HATA: {e}", [], "error",
+                   int((time.time() - t0) * 1000))
         raise HTTPException(status_code=502, detail=f"Orkestrasyon hatası: {e}")
+    acts = data.get("actions", [])
+    events.log(
+        who.tenant, req.question, data.get("reply", ""),
+        [a.get("type") for a in acts if isinstance(a, dict)],
+        data.get("source", "?"), int((time.time() - t0) * 1000),
+    )
     return AskResponse(
         reply=data.get("reply", ""),
         conversationId=data.get("conversationId"),
-        actions=data.get("actions", []),
+        actions=acts,
     )
 
 
@@ -126,6 +137,68 @@ async def chat_ingest(req: ChatIngestRequest):
         )
     n = await graph.upsert_pages(who.tenant, [req.page])
     return IngestResponse(upserted=n, tenant=who.tenant)
+
+
+# ---------------- Konsol (yönetim arayüzü) ----------------
+def _admin(authorization: str):
+    if authorization != f"Bearer {settings.ADMIN_KEY}":
+        raise HTTPException(status_code=403, detail="Yönetici yetkisi yok")
+
+
+@app.get("/console")
+async def console_page():
+    path = os.path.join(os.path.dirname(settings.DIST_DIR), "console", "index.html")
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="console bulunamadı")
+    return FileResponse(path, media_type="text/html",
+                        headers={"Cache-Control": "no-store"})
+
+
+@app.get("/admin/stats")
+async def admin_stats(tenant: str = "", authorization: str = Header(default="")):
+    _admin(authorization)
+    s = graph.stats(tenant)
+    s["events"] = events.count()
+    s["provider"] = orchestrator.provider_info()
+    return s
+
+
+@app.get("/admin/pages")
+async def admin_pages(tenant: str = "", authorization: str = Header(default="")):
+    _admin(authorization)
+    return {"pages": graph.list_pages(tenant)}
+
+
+@app.get("/admin/graph")
+async def admin_graph(tenant: str = "", authorization: str = Header(default="")):
+    _admin(authorization)
+    return graph.graph_overview(tenant)
+
+
+@app.get("/admin/events")
+async def admin_events(tenant: str = "", limit: int = 100,
+                       authorization: str = Header(default="")):
+    _admin(authorization)
+    return {"events": events.recent(limit=limit, tenant=tenant)}
+
+
+@app.get("/admin/config")
+async def admin_config_get(authorization: str = Header(default="")):
+    _admin(authorization)
+    return orchestrator.provider_info()
+
+
+@app.post("/admin/config")
+async def admin_config_set(req: Request, authorization: str = Header(default="")):
+    """Herhangi bir OpenAI-uyumlu AI'ı bağla (model/base_url/api_key).
+    Çalışma-anı; restart'ta .env değerlerine döner."""
+    _admin(authorization)
+    body = await req.json()
+    return orchestrator.set_provider(
+        model=body.get("model"),
+        base_url=body.get("base_url"),
+        api_key=body.get("api_key"),
+    )
 
 
 @app.on_event("shutdown")

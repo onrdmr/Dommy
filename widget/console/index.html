@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Dommy Konsol</title>
+<style>
+  :root { --acc:#4f46e5; --bg:#0f1115; --card:#181b22; --line:#272b34; --txt:#e7e9ee; --mut:#9aa3b2; }
+  * { box-sizing:border-box; font-family:-apple-system,Segoe UI,Roboto,sans-serif }
+  body { margin:0; background:var(--bg); color:var(--txt); }
+  header { display:flex; align-items:center; gap:14px; padding:12px 18px; background:var(--card); border-bottom:1px solid var(--line); flex-wrap:wrap }
+  header h1 { font-size:17px; margin:0; }
+  header h1 b { color:var(--acc) }
+  header .grow { flex:1 }
+  input,select,button,textarea { background:#11141a; color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:13px }
+  button { cursor:pointer; }
+  button.p { background:var(--acc); border-color:var(--acc); color:#fff }
+  .dot { width:9px;height:9px;border-radius:50%;background:#666;display:inline-block;margin-right:5px }
+  .dot.ok{background:#22c55e} .dot.bad{background:#ef4444}
+  nav { display:flex; gap:4px; padding:10px 18px 0; background:var(--card) }
+  nav a { padding:9px 14px; cursor:pointer; color:var(--mut); border-bottom:2px solid transparent; font-size:14px }
+  nav a.active { color:var(--txt); border-bottom-color:var(--acc) }
+  main { padding:18px; }
+  .cards { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:18px }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px 18px; min-width:130px }
+  .card .n { font-size:26px; font-weight:700 }
+  .card .l { color:var(--mut); font-size:12px; margin-top:3px }
+  table { width:100%; border-collapse:collapse; font-size:13px }
+  th,td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top }
+  th { color:var(--mut); font-weight:600; position:sticky; top:0; background:var(--card) }
+  td.mono,.mono { font-family:ui-monospace,Menlo,monospace; font-size:12px }
+  .tag { font-size:11px; padding:2px 7px; border-radius:999px; border:1px solid var(--line) }
+  .tag.docs{color:#60a5fa;border-color:#60a5fa55} .tag.api{color:#34d399;border-color:#34d39955}
+  .tag.none{color:#9aa3b2} .tag.error{color:#f87171;border-color:#f8717155} .tag.dify{color:#c084fc;border-color:#c084fc55}
+  .wrap { background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:auto; max-height:70vh }
+  .row { display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap }
+  .mut { color:var(--mut); font-size:12px }
+  .hide { display:none }
+  .field { display:flex; flex-direction:column; gap:5px; margin-bottom:12px; max-width:520px }
+  .field label { font-size:12px; color:var(--mut) }
+  .empty { padding:30px; text-align:center; color:var(--mut) }
+</style>
+</head>
+<body>
+<header>
+  <h1><b>dom</b>my · Konsol</h1>
+  <span class="grow"></span>
+  <span class="mut">Tenant</span>
+  <input id="tenant" value="" placeholder="tenant" style="width:140px" />
+  <span class="mut">Admin key</span>
+  <input id="key" type="password" placeholder="ADMIN_KEY" style="width:170px" />
+  <button class="p" onclick="saveCfg()">Bağlan</button>
+  <span id="conn"><span class="dot"></span><span class="mut">—</span></span>
+</header>
+<nav>
+  <a data-t="overview" class="active">Genel Bakış</a>
+  <a data-t="pages">Sayfalar</a>
+  <a data-t="graph">Grafik</a>
+  <a data-t="events">Events</a>
+  <a data-t="settings">Ayarlar (AI)</a>
+</nav>
+<main>
+  <section id="overview">
+    <div class="cards" id="cards"></div>
+    <div class="mut">Sağlayıcı (LLM): <span id="provLine">—</span></div>
+  </section>
+
+  <section id="pages" class="hide">
+    <div class="row"><input id="pageSearch" placeholder="ara: url / ad / özet" style="flex:1;max-width:420px" oninput="renderPages()"><span class="mut" id="pageCount"></span></div>
+    <div class="wrap"><table><thead><tr><th>URL</th><th>Ad</th><th>Aksiyon</th><th>Özet</th></tr></thead><tbody id="pageBody"></tbody></table></div>
+  </section>
+
+  <section id="graph" class="hide">
+    <div class="cards" id="kindCards"></div>
+    <h3 class="mut">İlişkiler (okuduğu graf yapısı)</h3>
+    <div class="wrap"><table><thead><tr><th>Kaynak</th><th>İlişki</th><th>Hedef</th></tr></thead><tbody id="relBody"></tbody></table></div>
+  </section>
+
+  <section id="events" class="hide">
+    <div class="row">
+      <label class="mut"><input type="checkbox" id="auto" checked onchange="toggleAuto()"> Otomatik yenile (3sn)</label>
+      <button onclick="loadEvents()">Yenile</button>
+      <span class="mut" id="evCount"></span>
+    </div>
+    <div class="wrap"><table><thead><tr><th>Zaman</th><th>Soru</th><th>Kaynak</th><th>ms</th><th>Cevap</th></tr></thead><tbody id="evBody"></tbody></table></div>
+  </section>
+
+  <section id="settings" class="hide">
+    <p class="mut">Dommy, OpenAI-uyumlu <b>herhangi bir AI</b>'a bağlanır (Gemini, OpenAI, Groq, yerel LM Studio…). Aşağıdan değiştir (çalışma-anı; restart'ta .env'e döner). Embedding ucu ayrıdır.</p>
+    <div class="field"><label>Model</label><input id="cfgModel" placeholder="ör. gemini-2.0-flash / gpt-4o-mini"></div>
+    <div class="field"><label>Base URL (OpenAI-uyumlu)</label><input id="cfgBase" placeholder="https://.../v1/"></div>
+    <div class="field"><label>API Key (boş bırakırsan değişmez)</label><input id="cfgKey" type="password" placeholder="••••"></div>
+    <button class="p" onclick="saveProvider()">Sağlayıcıyı Uygula</button>
+    <div class="mut" id="provMsg" style="margin-top:10px"></div>
+  </section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+let TENANT = localStorage.getItem('dommy_tenant') || '';
+let KEY = localStorage.getItem('dommy_key') || '';
+$('#tenant').value = TENANT; $('#key').value = KEY;
+let autoTimer = null;
+
+function saveCfg(){
+  TENANT = $('#tenant').value.trim(); KEY = $('#key').value.trim();
+  localStorage.setItem('dommy_tenant', TENANT); localStorage.setItem('dommy_key', KEY);
+  loadActive(true);
+}
+async function api(path){
+  const r = await fetch(path, { headers: { 'Authorization': 'Bearer ' + KEY } });
+  if (r.status === 403) throw new Error('Admin key yanlış');
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+function setConn(ok, msg){
+  $('#conn').innerHTML = '<span class="dot '+(ok?'ok':'bad')+'"></span><span class="mut">'+msg+'</span>';
+}
+
+// --- tabs ---
+let active = 'overview';
+document.querySelectorAll('nav a').forEach(a => a.onclick = () => {
+  document.querySelectorAll('nav a').forEach(x=>x.classList.remove('active'));
+  a.classList.add('active');
+  document.querySelectorAll('main section').forEach(s=>s.classList.add('hide'));
+  active = a.dataset.t; $('#'+active).classList.remove('hide');
+  loadActive();
+});
+function loadActive(force){
+  if (active==='overview') loadOverview();
+  else if (active==='pages') loadPages();
+  else if (active==='graph') loadGraph();
+  else if (active==='events') loadEvents();
+  else if (active==='settings') loadSettings();
+}
+
+async function loadOverview(){
+  try {
+    const s = await api('/admin/stats?tenant='+encodeURIComponent(TENANT));
+    setConn(true, 'bağlı · '+TENANT);
+    $('#cards').innerHTML = [
+      ['Sayfa', s.pages], ['Aksiyon', s.actions], ['Toplam düğüm', s.total], ['Events', s.events]
+    ].map(([l,n])=>`<div class="card"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+    const p = s.provider||{};
+    $('#provLine').textContent = `${p.model} @ ${p.base_url} · key:${p.has_key?'✓':'✗'} · Dify:${p.dify?'açık':'kapalı'} · CanlıAPI:${p.live_api?'açık':'kapalı'}`;
+  } catch(e){ setConn(false, e.message); }
+}
+
+let PAGES = [];
+async function loadPages(){
+  try { const d = await api('/admin/pages?tenant='+encodeURIComponent(TENANT)); PAGES=d.pages||[]; setConn(true,'bağlı · '+TENANT); renderPages(); }
+  catch(e){ setConn(false, e.message); }
+}
+function renderPages(){
+  const q = ($('#pageSearch').value||'').toLowerCase();
+  const rows = PAGES.filter(p => !q || (p.url+p.name+(p.summary||'')).toLowerCase().includes(q));
+  $('#pageCount').textContent = rows.length+' / '+PAGES.length+' sayfa';
+  $('#pageBody').innerHTML = rows.map(p=>`<tr>
+    <td class="mono">${esc(p.url)}</td><td>${esc(p.name||'')}</td>
+    <td style="text-align:center">${p.actions||0}</td>
+    <td class="mut">${esc((p.summary||'').slice(0,160))}…</td></tr>`).join('')
+    || '<tr><td colspan="4" class="empty">kayıt yok</td></tr>';
+}
+
+async function loadGraph(){
+  try {
+    const g = await api('/admin/graph?tenant='+encodeURIComponent(TENANT)); setConn(true,'bağlı · '+TENANT);
+    $('#kindCards').innerHTML = (g.kinds||[]).map(k=>`<div class="card"><div class="n">${k.c}</div><div class="l">${esc(k.kind)}</div></div>`).join('')||'';
+    $('#relBody').innerHTML = (g.relations||[]).map(r=>`<tr><td>${esc(r.src||'')}</td><td><span class="tag">${esc(r.rel)}</span></td><td>${esc(r.dst||'')}</td></tr>`).join('')
+      || '<tr><td colspan="3" class="empty">ilişki yok</td></tr>';
+  } catch(e){ setConn(false, e.message); }
+}
+
+async function loadEvents(){
+  try {
+    const d = await api('/admin/events?limit=150&tenant='+encodeURIComponent(TENANT)); setConn(true,'bağlı · '+TENANT);
+    const ev = d.events||[];
+    $('#evCount').textContent = ev.length+' olay';
+    $('#evBody').innerHTML = ev.map(e=>`<tr>
+      <td class="mono mut">${new Date(e.ts*1000).toLocaleTimeString('tr-TR')}</td>
+      <td>${esc(e.question)}</td>
+      <td><span class="tag ${e.source}">${esc(e.source)}</span></td>
+      <td class="mono">${e.ms}</td>
+      <td class="mut">${esc((e.reply||'').slice(0,140))}</td></tr>`).join('')
+      || '<tr><td colspan="5" class="empty">henüz soru sorulmadı</td></tr>';
+  } catch(e){ setConn(false, e.message); }
+}
+function toggleAuto(){
+  if (autoTimer){ clearInterval(autoTimer); autoTimer=null; }
+  if ($('#auto').checked) autoTimer = setInterval(()=>{ if(active==='events') loadEvents(); }, 3000);
+}
+
+async function loadSettings(){
+  try { const p = await api('/admin/config'); setConn(true,'bağlı · '+TENANT);
+    $('#cfgModel').value = p.model||''; $('#cfgBase').value = p.base_url||'';
+    $('#provMsg').textContent = 'Aktif: '+p.model+' · key:'+(p.has_key?'✓':'✗');
+  } catch(e){ setConn(false, e.message); }
+}
+async function saveProvider(){
+  try {
+    const r = await fetch('/admin/config', { method:'POST',
+      headers:{'Authorization':'Bearer '+KEY,'Content-Type':'application/json'},
+      body: JSON.stringify({ model:$('#cfgModel').value, base_url:$('#cfgBase').value, api_key:$('#cfgKey').value }) });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const p = await r.json(); $('#cfgKey').value='';
+    $('#provMsg').textContent = 'Uygulandı → '+p.model+' @ '+p.base_url+' · key:'+(p.has_key?'✓':'✗');
+  } catch(e){ $('#provMsg').textContent='Hata: '+e.message; }
+}
+
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+toggleAuto();
+loadOverview();
+</script>
+</body>
+</html>
